@@ -1,34 +1,79 @@
 # tests/test_analyzer.py
-from audio.loader import load_audio
-from features.pitch import get_pitch_features
+import numpy as np
+import json
+from audio.loader import load_audio, AudioData
+from audio.preprocessing import preprocess_audio
+from features.segmentation import get_segmentation_features
+from features.pitch import get_pitch_stream
 from analysis.pitch_analyzer import (
-    analyze_pitch,
+    PitchAnalyzer,
+    PitchAnalyzerExtended,
+    hz_to_midi,
+    midi_to_note_name,
+    merge_short_notes,
+    smooth_notes
 )
 
-# Загружаем тестовый аудиофайл
-y, sr = load_audio("audio_samples/my_voice.wav")
 
-# Извлекаем признаки
-pitch = get_pitch_features(y, sr, method="yin")
+def main():
+    audio: AudioData = load_audio("audio_samples/my_voice.wav")
+    processed_waveform = preprocess_audio(audio.waveform, audio.sample_rate)
+    processed = AudioData(
+        waveform=processed_waveform,
+        sample_rate=audio.sample_rate,
+        duration=len(processed_waveform) / audio.sample_rate,
+        samples=len(processed_waveform),
+        min_amplitude=float(processed_waveform.min()),
+        max_amplitude=float(processed_waveform.max()),
+        mean_amplitude=float(processed_waveform.mean()),
+        std_amplitude=float(processed_waveform.std()),
+    )
 
-# Анализируем
-result = analyze_pitch(pitch)
+    pitch_stream = get_pitch_stream(processed, method="yin")
 
-# Проверяем структуру результата
-assert "dominant_note_midi" in result
-assert "dominant_note_name" in result
-assert "confidence" in result
-assert "stability" in result
-assert "score" in result
-assert "segments" in result
+    raw_segments = get_segmentation_features(
+        f0=np.array(pitch_stream["f0"]),
+        voiced=np.array(pitch_stream["voiced"]),
+        times=np.array(pitch_stream["times"])
+    )
 
-# Дополнительные проверки
-assert 0.0 <= result["confidence"] <= 1.0
-assert 0.0 <= result["score"] <= 100.0
+    # 🔑 Преобразуем в NoteSegment формат
+    segments = []
+    for seg in raw_segments:
+        duration = seg["end"] - seg["start"]
+        midi = hz_to_midi(seg["f0_mean"])
+        segments.append({
+            "note": midi_to_note_name(midi),
+            "freq": seg["f0_mean"],
+            "start": seg["start"],
+            "end": seg["end"],
+            "duration": duration,
+            "stability": seg["f0_stability"],
+            "type": seg.get("type", "sung_note")
+        })
 
-# Вывод для наглядности
-print("Dominant note (MIDI):", result["dominant_note_midi"])
-print("Dominant note:", result["dominant_note_name"])
-print("Confidence:", result["confidence"])
-print("Stability:", result["stability"])
-print("Score:", result["score"])
+    # 🧹 Сначала чистим сегменты
+    segments = merge_short_notes(segments, min_duration=0.08)
+    segments = smooth_notes(segments)
+
+    # ⚡️ Базовый анализ
+    analyzer = PitchAnalyzer()
+    report = analyzer.analyze(segments)
+    print("=== Base Report ===")
+    print(json.dumps(report, indent=2))
+
+    # ⚡️ Расширенный анализ
+    ext_analyzer = PitchAnalyzerExtended()
+    extended_report = ext_analyzer.analyze_extended(
+        segments=segments,
+        f0=np.array(pitch_stream["f0"]),
+        times=np.array(pitch_stream["times"]),
+        tempo=120.0,
+        reference=["C4", "E4", "G4"]
+    )
+    print("\n=== Extended Report ===")
+    print(json.dumps(extended_report, indent=2))
+
+
+if __name__ == "__main__":
+    main()

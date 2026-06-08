@@ -1,6 +1,8 @@
-# tests/test_pitch.py
+# tests/test_segmentation.py
+import numpy as np
 from audio.loader import load_audio, AudioData
 from audio.preprocessing import preprocess_audio
+from features.segmentation import get_segmentation_features
 from features.pitch import get_pitch_stream
 
 
@@ -17,10 +19,18 @@ def main():
         mean_amplitude=float(processed_waveform.mean()),
         std_amplitude=float(processed_waveform.std()),
     )
+
     pitch_stream = get_pitch_stream(processed, method="yin")
-    print("times:", pitch_stream["times"][:10])
-    print("f0:", pitch_stream["f0"][:10])
-    print("voiced:", pitch_stream["voiced"][:10])
+
+    segments = get_segmentation_features(
+        f0=np.array(pitch_stream["f0"]),
+        voiced=np.array(pitch_stream["voiced"]),
+        times=np.array(pitch_stream["times"])
+    )
+
+    print("Detected segments:")
+    for seg in segments:
+        print(seg)
 
 
 if __name__ == "__main__":
