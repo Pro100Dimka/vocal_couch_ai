@@ -1,21 +1,24 @@
-# tests/test_analyzer.py
+# tests/test_rhythm.py
 import numpy as np
-import json
 from audio.loader import load_audio, AudioData
 from audio.preprocessing import preprocess_audio
 from features.segmentation import get_segmentation_features
 from features.pitch import get_pitch_stream
+from utils.logger import log
+from utils.file_ops import remove_old
 from analysis.pitch_analyzer import (
-    PitchAnalyzer,
     PitchAnalyzerExtended,
     hz_to_midi,
     midi_to_note_name,
     merge_short_notes,
     smooth_notes
 )
+from analysis.rhythm_analyzer import RhythmAnalyzer
+import json
 
 
 def main():
+    remove_old([])
     audio: AudioData = load_audio("audio_samples/my_voice.wav")
     processed_waveform = preprocess_audio(audio.waveform, audio.sample_rate)
     processed = AudioData(
@@ -55,11 +58,6 @@ def main():
     segments = merge_short_notes(segments, min_duration=0.08)
     segments = smooth_notes(segments)
 
-    analyzer = PitchAnalyzer()
-    report = analyzer.analyze(segments)
-    print("=== Base Report ===")
-    print(json.dumps(report, indent=2))
-
     ext_analyzer = PitchAnalyzerExtended()
     extended_report = ext_analyzer.analyze_extended(
         segments=segments,
@@ -68,8 +66,16 @@ def main():
         tempo=120.0,
         reference=["C4", "E4", "G4"]
     )
-    print("\n=== Extended Report ===")
-    print(json.dumps(extended_report, indent=2))
+    rhythm_analyzer = RhythmAnalyzer(reference_tempo=120.0)
+
+    # Берём список нот из extended_report["notes"]
+    rhythm_report = rhythm_analyzer.analyze([
+        {"start": n["start"], "end": n["end"], "duration": n["duration"]}
+        for n in extended_report["notes"]   # <-- исправлено
+        if n["type"] == "sung_note"
+    ])
+
+    log(json.dumps(rhythm_report, indent=2))
 
 
 if __name__ == "__main__":
