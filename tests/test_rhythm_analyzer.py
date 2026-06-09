@@ -1,7 +1,7 @@
 # tests/rhythm_analyzer.py
 import numpy as np
 from audio.loader import load_audio, AudioData
-from audio.preprocessing import preprocess_audio
+from audio.preprocessor import preprocess_audio
 from features.segmentation import get_segmentation_features
 from features.pitch import get_pitch_stream
 from utils.logger import log

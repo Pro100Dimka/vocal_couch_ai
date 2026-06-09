@@ -73,7 +73,7 @@ def postprocess(f0, voiced_flag, voiced_prob, threshold=0.05):
     return f0_smooth, voiced
 
 
-def get_pitch_stream(audio_data, method="pyin"):
+def get_pitch(audio_data, method="pyin"):
     times, f0_raw, voiced_flag, voiced_prob = extract_pitch(
         audio_data.waveform,
         audio_data.sample_rate,

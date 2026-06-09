@@ -4,7 +4,7 @@ import json
 from utils.logger import log
 from analysis.tension_analyzer import TensionAnalyzer
 from audio.loader import load_audio, AudioData
-from audio.preprocessing import preprocess_audio
+from audio.preprocessor import preprocess_audio
 from features.segmentation import get_segmentation_features
 from features.pitch import get_pitch_stream
 from utils.file_ops import remove_old
